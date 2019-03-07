@@ -3,33 +3,32 @@
 #
 # Forked and adapted from: https://github.com/mcmcclur/ArchiveDiscourse
 
-# The main code added to the original script is a 
+# The main code added to the original script is a
 # way to get *all* posts in a topic (not just the first 20)
 #
 # The code is not perfect by any means, but it worked for my purposes!
 #
-# Be sure to define the base_url of the Discourse instance, 
-# the path of the directory to save stuff on the local machine, 
+# Be sure to define the base_url of the Discourse instance,
+# the path of the directory to save stuff on the local machine,
 # and an archive_blurb to describe the site.
 #
 # Note that the directory specified by `path` will be overwritten.
 #
 #
 # It is reecommended to run this code using a Python 3 and a virtualenv.
-# One place to learn more about how to do that is here: 
+# One place to learn more about how to do that is here:
 # https://realpython.com/python-virtual-environments-a-primer/
 #
 
-import os
+import os, requests, base64, sys, ssl
 from datetime import date
-# Make sure to customize these variables 
-base_url = 'https://my-discourse.org'
-path = os.path.join(os.getcwd(), 'my-discourse-archive')
-archive_blurb = "An archive of my-discourse.org as of " + \
-    date.today().strftime("%A %B %d, %Y") + '.'
 
-import requests, base64, sys
-import ssl
+# Make sure to customize these variables
+cookie = ''
+base_url = 'https://my-discourse'
+path = os.path.join(os.getcwd(), 'export')
+archive_blurb = "Archive " + date.today().strftime("%d/%m/%Y") + '.'
+
 try:
     from urllib.parse import urlparse
 except ImportError:
@@ -37,12 +36,11 @@ except ImportError:
 from bs4 import BeautifulSoup as bs
 from PIL import Image
 from io import BytesIO
-import requests, base64
 from time import sleep
 
 from shutil import rmtree
 
-# When archiving larger sites (like meta.discourse.org), you might need to 
+# When archiving larger sites (like meta.discourse.org), you might need to
 # increase the number of max_retries to connect.
 # Doesn't seem to be necessary for all sites but it *is* necessary for Meta.
 
@@ -51,79 +49,24 @@ from requests.adapters import HTTPAdapter
 s = requests.Session()
 s.mount(base_url, HTTPAdapter(max_retries=5))
 
+# Copy the cookie from your browser if it's a private forum
+jar = requests.cookies.RequestsCookieJar()
+jar.set('_t', cookie, domain=urlparse(base_url).hostname, path='/')
+
 # Templates for the webpages
 base_scheme = urlparse(base_url).scheme
 
 # Template for the main page. Subsequent code will replace a few items indicated by
-# <!-- COMMENTS -->
-main_template = """<!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-    <!-- TITLE -->
-    <meta name="viewport" content="width=device-width">
-    <link rel="stylesheet" href="https://use.fontawesome.com/2374bdec1c.css">
-    <link rel="stylesheet" href="./archived.css" />
-  </head>
-  
-  <body>
-
-    <header class="header">
-      <div class="title-span">
-        <h1 class="site-title">
-          <img src="images/site-logo.png" height="40" alt="<!-- JUST_SITE_TITLE -->" id="site-logo">
-        </h1>
-      </div>
-    </header>
-
-    <div class="main">
-      <div class="archive-span"><!-- ARCHIVE_BLURB --></div>
-      <div class="topics">
-        <div class="header-row">
-          <span class="topic-head">Topics</span>
-          <span class="category-head">Category</span>
-          <span class="post-count-head">Posts</span>
-        </div>
-        <!-- TOPIC_LIST -->
-      </div>
-    </div>
-  </body>
-</html>
-"""
+with open('templates/main.html', 'r') as file:
+  main_template = file.read()
 
 # Template for the individual topic pages
-topic_template = """<!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width">
-    <title><!-- TOPIC_TITLE --></title>
-    <link rel="stylesheet" href="../../../archived.css" />
-    <script type="text/x-mathjax-config">
-      MathJax.Hub.Config({tex2jax: {inlineMath: [['$','$'], ['\\\\(','\\\\)']]}});
-    </script>
-    <script type="text/javascript" async
-      src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-MML-AM_CHTML">
-    </script>
-  </head>
-  
-  <body>
-    <header class="header">
-      <div class="title-span">
-        <a href="../../../">
-          <img src="../../../images/site-logo.png" height="40" alt="<!-- JUST_SITE_TITLE -->" id="site-logo" />
-        </a>
-      </div>
-    </header>
+with open('templates/topic.html', 'r') as file:
+  topic_template = file.read()
 
-    <div class="main">
-    <div class="archive-span"><!-- ARCHIVE_BLURB --></div>
-    <h1 class="topic-title"><!-- TOPIC_TITLE --></h1>
-      <!-- POST_LIST -->
-    </div>
-  </body>
-</html>
-"""
+# Load CSS
+with open('archived.css', 'r') as file:
+  css = file.read()
 
 # Function that writes out each individual topic page
 def write_topic(topic_json):
@@ -133,7 +76,7 @@ def write_topic(topic_json):
         os.makedirs(topic_relative_url)
     except Exception as err:
         print ('in write_topic error:', 'make directory')
-    response = requests.get(topic_download_url + '.json')
+    response = requests.get(topic_download_url + '.json', cookies=jar)
     # posts_json will contain only the first 20 posts in a topic
     posts_json = response.json()['post_stream']['posts']
     # posts_stream will grab all of the post ids for that topic
@@ -142,16 +85,16 @@ def write_topic(topic_json):
     posts_stream = posts_stream[20:]
     # break stream into a list of list chunks of n posts each for lighter requests
     n=20
-    chunked_posts_stream = [posts_stream[i * n:(i + 1) * n] for i in range((len(posts_stream) + n - 1) // n )] 
+    chunked_posts_stream = [posts_stream[i * n:(i + 1) * n] for i in range((len(posts_stream) + n - 1) // n )]
     posts_download_url = base_url + '/t/' + str(topic_json['id']) + '/posts.json?'
-    # make a request for the content associated with each post id 
+    # make a request for the content associated with each post id
     # chunk and append it to the posts_json list
     for chunk in chunked_posts_stream:
         formatted_posts_list = ""
         for post_id in chunk:
             formatted_posts_list = formatted_posts_list + 'post_ids[]=' + str(post_id) + '&'
         #print ("NEW LIST", formatted_posts_list, "\n")
-        response = requests.get(posts_download_url + formatted_posts_list)
+        response = requests.get(posts_download_url + formatted_posts_list, cookies=jar)
         posts_2_json = response.json()['post_stream']['posts']
         posts_json.extend(posts_2_json)
     # generate that HTML
@@ -188,7 +131,7 @@ def post_row(post_json):
     avatar_url = avatar_url.replace('{size}', '45')
     if not os.path.exists(os.getcwd() + '/images/' + avatar_file_name):
         try:
-            response = requests.get(avatar_url, stream=True)
+            response = requests.get(avatar_url, stream=True, cookies=jar)
             img = Image.open(BytesIO(response.content))
             img.save(os.getcwd() + '/images/' + avatar_file_name)
         except Exception as err:
@@ -199,8 +142,8 @@ def post_row(post_json):
 
     user_name = post_json['username']
     content = post_json['cooked']
-    
-    # Since we don't generate user information, 
+
+    # Since we don't generate user information,
     # replace any anchors of class mention with a span
     soup = bs(content, "html.parser")
     mention_tags = soup.findAll('a', {'class':'mention'})
@@ -224,9 +167,9 @@ def post_row(post_json):
             img_url = base_scheme + ':' + img_url
         else:
             img_url = base_url + img_url
-        #response = requests.get('http:' + img_url, stream=True)
+        #response = requests.get('http:' + img_url, stream=True, cookies=jar)
         try:
-            response = requests.get(img_url, stream=True)
+            response = requests.get(img_url, stream=True, cookies=jar)
             img = Image.open(BytesIO(response.content))
             img.save(os.getcwd() + '/images/' + file_name)
             img_tag['src'] = '../../../images/' + file_name
@@ -241,7 +184,7 @@ def post_row(post_json):
     content = ''
     for s in soup.contents:
         content = content + str(s)
-    
+
     post_string = '      <div class="post_container">\n'
     post_string = post_string + '        <div class="avatar_container">\n'
     post_string = post_string + '          <img src="../../../images/' + \
@@ -259,7 +202,7 @@ def post_row(post_json):
 
 # The topic_row function generates the HTML for each topic on the main page
 category_url = base_url + '/categories.json'
-response = requests.get(category_url)
+response = requests.get(category_url, cookies=jar)
 category_json = response.json()['category_list']['categories']
 category_id_to_name = dict([(cat['id'],cat['name']) for cat in category_json])
 
@@ -273,7 +216,7 @@ def topic_row(topic_json):
         topic_category = category_id_to_name[topic_json['category_id']]
     except KeyError:
         topic_category = ''
-    
+
     topic_html = topic_html + '        <span class="topic">'
     if topic_pinned:
         topic_html = topic_html + '<i class="fa fa-thumb-tack"'
@@ -300,7 +243,7 @@ os.mkdir('images')
 
 # Grab the site title and logo - available via the API but only after login
 # so we'll grab this one thing via Beautiful Soup.
-response = requests.get(base_url)
+response = requests.get(base_url, cookies=jar)
 soup = bs(response.content, "html.parser")
 site_title = soup.title
 site_logo = soup.find("img", {"id":"site-logo"})
@@ -313,7 +256,7 @@ else:
     parsed = urlparse(site_logo_image_url)
     if parsed.netloc == '':
         site_logo_image_url = base_url + site_logo_image_url
-    response = requests.get(site_logo_image_url, stream=True)
+    response = requests.get(site_logo_image_url, stream=True, cookies=jar)
     img = Image.open(BytesIO(response.content))
     img.save(os.getcwd() + '/images/site-logo.png')
 
@@ -329,22 +272,22 @@ with open(os.getcwd() + "/images/missing_image.png", "wb") as missing_image_fh:
 
 # Note that there might be errors but the code does attempt to deal with them gracefully by
 # passing over them and continuing.
-# 
+#
 # My archive of DiscoureMeta generated 19 errors - all image downloads that replaced with a missing image PNG.
 #
 
-# max_more_topics is the number of pages the code will load from the all topics list on your site 
+# max_more_topics is the number of pages the code will load from the all topics list on your site
 # You might find that you need to change max_more_topics depending on the size of your forum
-max_more_topics = 9;
+max_more_topics = 99;
 cnt = 0
 topic_path = '/latest.json?no_definitions=true&page='
 base_topic_url = base_url + topic_path
 url = base_topic_url + str(cnt)
 topic_list_string = ""
-response = requests.get(url)
+response = requests.get(url, cookies=jar)
 topic_list = response.json()['topic_list']['topics']
 for topic in topic_list:
-    try: 
+    try:
         write_topic(topic)
         topic_list_string = topic_list_string + topic_row(topic)
     except Exception as err:
@@ -358,9 +301,9 @@ while 'more_topics_url' in response.json()['topic_list'].keys() and cnt < max_mo
     print ('cnt is ', cnt, '\n============')
     cnt = cnt+1
     url = base_topic_url + str(cnt)
-    response = requests.get(url)
+    response = requests.get(url, cookies=jar)
     topic_list = response.json()['topic_list']['topics']
-    for topic in topic_list[1:]:  ## STARTED AT 1 'CAUSE IT APPEARS THAT 
+    for topic in topic_list[1:]:  ## STARTED AT 1 'CAUSE IT APPEARS THAT
                                   ## LAST THIS = FIRST NEXT   GOTTA CHECK THAT!
         topic_list_string = topic_list_string + topic_row(topic)
         write_topic(topic)
@@ -378,272 +321,6 @@ f.close()
 
 
 ## Write out the CSS.
-
-css = """body{
-  margin: 0;
-  padding: 0;
-}
-
-.archive-banner{
-    background-color: gold;
-    text-align: center;
-    padding: 5px;
-    font-family: Lato, Helvetica, sans-serif;
-    font-weight: bold;
-    font-size: 14px;
-}
-
-.custom-nav{
-    height: 51px;
-    font-family: Lato, Helvetica, sans-serif;
-    background-color: #fff;
-    border: 0px;
-    border-bottom: 1px solid #e7e7e7;
-    font-weight: 700;
-    //padding: 0 5em 0 5em;
-    width: 85%;
-    margin: auto
-}
-    
-.custom-nav .navbar-header{
-    margin-left: 0px;
-    margin-right: 0px;
-    float: left;
-    height: 50px;    
-}    
-
-.custom-nav .navbar-brand img{
-    max-width: 120px;
-    padding: 5px 10px 5px 0px;
-}
-
-.nav {
-   margin-bottom: 0;
-   padding-left: 0;
-   list-style: none;
-}
-    
-.nav > li {
-    position: relative;
-    display: block;
-    float: left;
-    height: 50px;
-}
-    
-.nav > li > a {
-    position: relative;
-    display: block;
-    padding: 10px 15px;
-}
-    
-.nav > li > a:hover,
-.nav > li > a:focus {
-    text-decoration: none;
-}
-    
-.navbar-nav {
-   margin: 0px;
-   float: left;
-}
-    
-.navbar-nav > li > a {
-    padding: 15px;
-    line-height: 20px;
-}
-    
-.custom-nav .navbar-nav > li > a {
-  color: #191919;
-}
-
-.custom-nav .navbar-nav > li > a:hover, 
-.custom-nav .navbar-nav > li > a:focus {
-    color: #0099cc;
-}
-   
-.custom-nav .navbar-nav > .active > a, 
-.custom-nav .navbar-nav > .active > a:hover, 
-.custom-nav .navbar-nav > .active > a:focus {
-    color: #191919;
-    background-color: #e6f5fa;
-}
-
-.title-span{
-  background-color: #fff;
-}
-
-@media only screen and (max-width: 760px) {
-    body {
-        margin: 0;
-    }
-    
-    #nav-link-list{
-      display: none;
-    }
-
-    .custom-nav{
-      padding: 0;
-      padding-left: 5px;
-    }
-
-    .header {
-        position: fixed;
-        top: 0;
-        width: 100%;
-        padding: 10px 0 0 10px;
-        z-index: 100;
-        background-color: #fff;
-        box-shadow: 0 2px 4px -1px rgba(0,0,0,0.25);
-    }
-    .title-span {
-        width: 100%;
-    }
-    h1.site-title {
-      font-size: 200%;
-      margin: 0px;
-    }
-    .archive-span {
-        margin: 0 10px 15px 10px;
-        padding: 10px;
-        color: gray;
-        text-align: center;
-    }
-    .main{
-        width: 90%;
-        margin-top: 70px;
-        margin-left: auto;
-        margin-right: auto;
-        margin-bottom: auto;
-    }
-    .topic-head{
-        display: inline-block;
-        width:90%;
-    }
-    .category-head{
-        display: none;
-    }
-    .post-count-head{
-        display: none;
-    }
-    .topic{
-        display: inline-block;
-        width:90%;
-    }
-    .category{
-        display: none;
-    }
-    .post-count{
-        display: none;
-    }
-}
-
-@media only screen and (min-width: 761px) {
-  .header {
-      position: fixed;
-      top: 0;
-      width: 100%;
-      padding: 10px 0 0 0;
-      z-index: 100;
-      background-color: #fff;
-      box-shadow: 0 2px 4px -1px rgba(0,0,0,0.25);
-  }
-  .title-span {
-      width: 80%;
-      margin: auto;
-  }
-  h1.site-title {
-    font-size: 300%;
-    margin: 0px;
-  }
-  .archive-span {
-      color: gray;
-      font-size: 120%;
-      padding: 10px;
-      margin: 0 10px 15px 10px;
-      text-align: center;
-  }
-  .main{
-      width: 70%;
-      margin-top: 90px;
-      margin-left: auto;
-      margin-right: auto;
-      margin-bottom: auto;
-  }
-  .topic-head{
-      display: inline-block;
-      width:70%;
-  }
-  .category-head{
-      display: inline-block;
-      width:15%;
-  }
-  .post-count-head{
-      display: inline-block;
-      width:14%;
-  }
-  .topic{
-      display: inline-block;
-      width:70%;
-  }
-  .category{
-      display: inline-block;
-      width:15%;
-  }
-  .post-count{
-      display: inline-block;
-      width:14%;
-  }
-}
-
-a {
-    color: black;
-}
-a:visited {
-    color: gray;
-}
-
-h1.topic-title {
-    border-bottom: 2px solid darkgray;
-}
-
-.user_name {
-    font-size: 110%;
-    color: #555555;
-}
-.post_container {
-    border-bottom: 1px solid lightgray;
-    padding: 20px;
-}
-
-.avatar {
-    border-radius: 50%;
-}
-.avatar_container {
-    float: left;
-}
-
-label {
-    display: inline-block;
-    width: 5em;
-}
-
-.fa {
-    padding-right: 5px;
-}
-.header-row {
-    padding-bottom: 8px;
-    border-bottom: 3px solid gray;
-}
-.topic-row {
-    padding: 8px;
-    border-bottom: 1px solid lightgray;
-}
-
-div.meta {
-    display: none;
-}
-
-"""
-
 f = open('archived.css', 'w')
 f.write(css)
 f.close()
