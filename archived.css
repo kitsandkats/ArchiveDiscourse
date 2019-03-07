@@ -1,6 +1,7 @@
 body {
     margin: 0;
     padding: 0;
+    font-family: Lato, Helvetica, sans-serif;
 }
 
 .archive-banner {
@@ -19,7 +20,6 @@ body {
     border: 0px;
     border-bottom: 1px solid #e7e7e7;
     font-weight: 700;
-/ / padding: 0 5 em 0 5 em;
     width: 85%;
     margin: auto
 }
@@ -253,14 +253,34 @@ h1.topic-title {
 .post_container {
     border-bottom: 1px solid lightgray;
     padding: 20px;
+    font-size: 0;
+}
+
+.post_container > *{
+    font-size: 16px;
 }
 
 .avatar {
-    border-radius: 50%;
+    border-radius: 4px;
 }
 
 .avatar_container {
-    float: left;
+    display: inline-block;
+    vertical-align: top;
+    width:45px;
+    margin-right: 10px;
+}
+
+.post{
+    display: inline-block;
+    vertical-align: top;
+    width:calc(100% - 55px);
+}
+
+.emoji{
+    width: 1em;
+    height:1em;
+    vertical-align: middle;
 }
 
 label {
