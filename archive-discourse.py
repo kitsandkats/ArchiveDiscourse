@@ -15,14 +15,14 @@
 # Note that the directory specified by `path` will be overwritten.
 #
 #
-# It is reecommended to run this code using a Python 3 and a virtualenv.
+# It is recommended to run this code using Python 3 and a virtualenv.
 # One place to learn more about how to do that is here:
 # https://realpython.com/python-virtual-environments-a-primer/
 #
 
 import os, requests, base64, sys, ssl
 from datetime import date
-Make sure to customize these variables
+# *********** Make sure to customize these variables ************
 base_url = 'https://my-discourse.org'
 path = os.path.join(os.getcwd(), 'my-discourse-archive')
 archive_blurb = "An archive of my-discourse.org as of " + \
@@ -53,6 +53,7 @@ s.mount(base_url, HTTPAdapter(max_retries=5))
 
 # Copy the cookie from your browser if it's a private forum
 jar = requests.cookies.RequestsCookieJar()
+# *********** Make sure to customize these variables ************
 jar.set('_t', '', domain='my-discourse.org', path='/')
 
 # Templates for the webpages
