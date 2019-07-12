@@ -158,29 +158,30 @@ def post_row(post_json):
 
     img_tags = soup.findAll('img')
     for img_tag in img_tags:
-        img_url = img_tag['src']
-        parsed_url = urlparse(img_url)
-        path = parsed_url.path
-        file_name = path.split('/')[-1]
-        if(parsed_url.netloc and parsed_url.scheme):
-            pass
-        elif(parsed_url.netloc):
-            img_url = base_scheme + ':' + img_url
-        else:
-            img_url = base_url + img_url
-        #response = requests.get('http:' + img_url, stream=True, cookies=jar)
-        try:
-            response = requests.get(img_url, stream=True, cookies=jar)
-            img = Image.open(BytesIO(response.content))
-            img.save(os.getcwd() + '/images/' + file_name)
-            img_tag['src'] = '../../../images/' + file_name
-            # print('good', file_name, img_url)
-        except Exception as err:
-            template = "An exception of type {0} occured. Arguments:\n{1!r}"
-            message = template.format(type(err).__name__, err.args)
-            print('post_row', 'save image', file_name, img_url, message)
-            img_tag['src'] = '../../../images/missing_image.png'
-            #sys.exit(0)
+        if 'src' in img_tag:
+            img_url = img_tag['src']
+            parsed_url = urlparse(img_url)
+            path = parsed_url.path
+            file_name = path.split('/')[-1]
+            if(parsed_url.netloc and parsed_url.scheme):
+                pass
+            elif(parsed_url.netloc):
+                img_url = base_scheme + ':' + img_url
+            else:
+                img_url = base_url + img_url
+            #response = requests.get('http:' + img_url, stream=True, cookies=jar)
+            try:
+                response = requests.get(img_url, stream=True, cookies=jar)
+                img = Image.open(BytesIO(response.content))
+                img.save(os.getcwd() + '/images/' + file_name)
+                img_tag['src'] = '../../../images/' + file_name
+                # print('good', file_name, img_url)
+            except Exception as err:
+                template = "An exception of type {0} occured. Arguments:\n{1!r}"
+                message = template.format(type(err).__name__, err.args)
+                print('post_row', 'save image', file_name, img_url, message)
+                img_tag['src'] = '../../../images/missing_image.png'
+                #sys.exit(0)
 
     content = ''
     for s in soup.contents:
