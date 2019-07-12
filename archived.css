@@ -90,6 +90,21 @@ body {
     background-color: #fff;
 }
 
+code, pre {
+    font-family: "Courier New", monospace;
+    background: #f5f5f5;
+    color:#333;
+}
+
+pre{
+    padding: 5px;
+    overflow-x: auto;
+}
+
+p > code{
+    padding: 0 2px;
+}
+
 @media only screen and (max-width: 760px) {
     body {
         margin: 0;
