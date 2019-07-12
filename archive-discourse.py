@@ -15,7 +15,7 @@
 # Note that the directory specified by `path` will be overwritten.
 #
 #
-# It is reecommended to run this code using a Python 3 and a virtualenv.
+# It is recommended to run this code using Python 3 and a virtualenv.
 # One place to learn more about how to do that is here:
 # https://realpython.com/python-virtual-environments-a-primer/
 #
