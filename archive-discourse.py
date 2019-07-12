@@ -24,6 +24,7 @@ import os, requests, base64, sys, ssl
 from datetime import date
 
 # Make sure to customize these variables
+cookie_name = '_t'
 cookie = ''
 base_url = 'https://my-discourse'
 path = os.path.join(os.getcwd(), 'export')
@@ -51,7 +52,7 @@ s.mount(base_url, HTTPAdapter(max_retries=5))
 
 # Copy the cookie from your browser if it's a private forum
 jar = requests.cookies.RequestsCookieJar()
-jar.set('_t', cookie, domain=urlparse(base_url).hostname, path='/')
+jar.set(cookie_name, cookie, domain=urlparse(base_url).hostname, path='/')
 
 # Templates for the webpages
 base_scheme = urlparse(base_url).scheme
