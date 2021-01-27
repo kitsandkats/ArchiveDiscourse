@@ -20,6 +20,7 @@
 # https://realpython.com/python-virtual-environments-a-primer/
 #
 
+from datetime import date
 import os, requests, base64
 
 # Make sure to customize these variables
